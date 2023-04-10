@@ -4,100 +4,100 @@ from wtforms import Form,StringField,TextAreaField,PasswordField,validators
 from passlib.hash import sha256_crypt
 from functools import wraps
 
-# Kullanıcı Giriş Decorator'ı
-def login_required(f):
+# User Log In Decorator
+def login_required(f): #login decorator
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "logged_in" in session:
+        if "logged_in" in session: #logged in check
             return f(*args, **kwargs)
         else:
             flash("Please login to view this page.","danger")
             return redirect(url_for("login"))
 
     return decorated_function
-# Kullanıcı Kayıt Formu
-class RegisterForm(Form):
-    name = StringField("İsim Soyisim",validators=[validators.Length(min = 4,max = 25)])
-    username = StringField("Kullanıcı Adı",validators=[validators.Length(min = 5,max = 35)])
-    email = StringField("Email Adresi",validators=[validators.Email(message = "Lütfen Geçerli Bir Email Adresi Girin...")])
-    password = PasswordField("Parola:",validators=[
-        validators.DataRequired(message = "Lütfen bir parola belirleyin"),
-        validators.EqualTo(fieldname = "confirm",message="Parolanız Uyuşmuyor...")
+# User Sign Up Form
+class RegisterForm(Form): #form class
+    name = StringField("Name-Last Name",validators=[validators.Length(min = 4,max = 25)])
+    username = StringField("Username",validators=[validators.Length(min = 5,max = 35)])
+    email = StringField("Email Adddress",validators=[validators.Email(message = "Lütfen Geçerli Bir Email Adresi Girin...")]) #validator
+    password = PasswordField("Password:",validators=[ 
+        validators.DataRequired(message = "Please enter a password"),
+        validators.EqualTo(fieldname = "confirm",message="Passwords are not matching")
     ])
-    confirm = PasswordField("Parola Doğrula")
-class LoginForm(Form):
-    username = StringField("Kullanıcı Adı")
-    password = PasswordField("Parola")
+    confirm = PasswordField("Confirm Password")
+class LoginForm(Form): #login form
+    username = StringField("Username")
+    password = PasswordField("Password")
 app = Flask(__name__)
 app.secret_key= "ybblog"
-
+//set the SQL Database
 app.config["MYSQL_HOST"] = "localhost"
 app.config["MYSQL_USER"] = "root"
 app.config["MYSQL_PASSWORD"] = ""
 app.config["MYSQL_DB"] = "ybblog"
 app.config["MYSQL_CURSORCLASS"] = "DictCursor"
 
-mysql = MySQL(app)
+mysql = MySQL(app) #connect SQL to app
 
-@app.route("/")
+@app.route("/") #determine the root
 def index():
-   return render_template("index.html")
+   return render_template("index.html") #rendering
 @app.route("/about")
 def about():
     return render_template("about.html")
-# Makale Sayfası
+# Article Page
 @app.route("/articles")
 def articles():
-    cursor = mysql.connection.cursor()
+    cursor = mysql.connection.cursor() #create the cursor in database
 
-    sorgu = "Select * From articles"
+    sorgu = "Select * From articles" #sorgu
 
-    result = cursor.execute(sorgu)
+    result = cursor.execute(sorgu) #execute
 
     if result > 0:
-        articles = cursor.fetchall()
+        articles = cursor.fetchall() #read all the rows
         return render_template("articles.html",articles = articles)
     else:
         return render_template("articles.html")
 
-@app.route("/dashboard")
-@login_required
+@app.route("/dashboard") 
+@login_required //if logged in
 def dashboard():
     cursor = mysql.connection.cursor()
 
     sorgu = "Select * From articles where author = %s"
 
-    result = cursor.execute(sorgu,(session["username"],))
+    result = cursor.execute(sorgu,(session["username"],)) #find the username
 
     if result > 0:
-        articles = cursor.fetchall()
+        articles = cursor.fetchall() #read all
         return render_template("dashboard.html",articles = articles)
     else:
         return render_template("dashboard.html")
-#Kayıt Olma
-@app.route("/register",methods = ["GET","POST"])
+#Sign Up
+@app.route("/register",methods = ["GET","POST"]) #determine the methods
 def register():
-    form = RegisterForm(request.form)
+    form = RegisterForm(request.form) #take the form
 
-    if request.method == "POST" and form.validate():
+    if request.method == "POST" and form.validate(): #if it is okay and correct method take the info fromm the user
         name = form.name.data
         username = form.username.data
         email = form.email.data
-        password = sha256_crypt.encrypt(form.password.data)
+        password = sha256_crypt.encrypt(form.password.data) #encrpyt the password
 
         cursor = mysql.connection.cursor()
 
-        sorgu = "Insert into users(name,email,username,password) VALUES(%s,%s,%s,%s)"
+        sorgu = "Insert into users(name,email,username,password) VALUES(%s,%s,%s,%s)" #insert the data
 
         cursor.execute(sorgu,(name,email,username,password))
-        mysql.connection.commit()
+        mysql.connection.commit() #commit changes
 
         cursor.close()
         flash("Succesfully signed up.","success")
         return redirect(url_for("login"))
     else:
         return render_template("register.html",form = form)
-# Login İşlemi
+# Login Process
 @app.route("/login",methods =["GET","POST"])
 def login():
     form = LoginForm(request.form)
@@ -126,15 +126,15 @@ def login():
                return redirect(url_for("login")) 
 
        else:
-           flash("No such user.","danger")
+           flash("No such user.","danger") # flash messages
            return redirect(url_for("login"))
 
     
     return render_template("login.html",form = form)
 
-# Detay Sayfası
+# Deatil Page
 
-@app.route("/article/<string:id>")
+@app.route("/article/<string:id>") #see the articles detailed
 def article(id):
     cursor = mysql.connection.cursor()
     
@@ -144,19 +144,19 @@ def article(id):
 
     if result > 0:
         article = cursor.fetchone()
-        return render_template("article.html",article = article)
+        return render_template("article.html",article = article) # see the article
     else:
         return render_template("article.html")
-# Logout İşlemi
+# Logout Process
 @app.route("/logout")
 def logout():
-    session.clear()
+    session.clear() #clear the login session
     return redirect(url_for("index"))
-# Makale Ekleme
+# Add Article
 @app.route("/addarticle",methods = ["GET","POST"])
 def addarticle():
     form = ArticleForm(request.form)
-    if request.method == "POST" and form.validate():
+    if request.method == "POST" and form.validate():  # if okay to add take the data
         title = form.title.data
         content = form.content.data
 
@@ -170,19 +170,19 @@ def addarticle():
 
         cursor.close()
 
-        flash("Article succesfully added","success")
+        flash("Article succesfully added","success") # give the message
 
         return redirect(url_for("dashboard"))
 
     return render_template("addarticle.html",form = form)
 
-#Makale Silme
+# Delete Article
 @app.route("/delete/<string:id>")
 @login_required
 def delete(id):
     cursor = mysql.connection.cursor()
 
-    sorgu = "Select * from articles where author = %s and id = %s"
+    sorgu = "Select * from articles where author = %s and id = %s"  # select the article to be deleted
 
     result = cursor.execute(sorgu,(session["username"],id))
 
@@ -195,13 +195,13 @@ def delete(id):
 
         return redirect(url_for("dashboard"))
     else:
-        flash("No such article or you are not authorizied to do the operation.","danger")
+        flash("No such article or you are not authorizied to do the operation.","danger")  # if no article
         return redirect(url_for("index"))
-#Makale Güncelleme
+# Update Article
 @app.route("/edit/<string:id>",methods = ["GET","POST"])
 @login_required
 def update(id):
-   if request.method == "GET":
+   if request.method == "GET":  # if method is okay
        cursor = mysql.connection.cursor()
 
        sorgu = "Select * from articles where id = %s and author = %s"
@@ -211,10 +211,10 @@ def update(id):
            flash("No such article or you are not authorizied to do the operation.","danger")
            return redirect(url_for("index"))
        else:
-           article = cursor.fetchone()
+           article = cursor.fetchone()  # just one article is taken
            form = ArticleForm()
 
-           form.title.data = article["title"]
+           form.title.data = article["title"] 
            form.content.data = article["content"]
            return render_template("update.html",form = form)
 
@@ -238,14 +238,14 @@ def update(id):
        return redirect(url_for("dashboard"))
 
        pass
-# Makale Form
-class ArticleForm(Form):
+# Article Form
+class ArticleForm(Form):  # article form create
     title = StringField("Article Title",validators=[validators.Length(min = 5,max = 100)]) 
     content = TextAreaField("Article Content",validators=[validators.Length(min = 10)])
 
-# Arama URL
+# Search URL
 @app.route("/search",methods = ["GET","POST"])
-def search():
+def search(): # search the keyword
    if request.method == "GET":
        return redirect(url_for("index"))
    else:
@@ -264,5 +264,5 @@ def search():
            articles = cursor.fetchall()
 
            return render_template("articles.html",articles = articles)
-if __name__ == "__main__":
+if __name__ == "__main__":  # run the app
     app.run(debug=True)
